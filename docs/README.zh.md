@@ -39,6 +39,7 @@
 | `kimi_cli` | Kimi Code CLI | `.config/agents/skills` | `.config/agents` |
 | `augment` | Augment | `.augment/rules` | `.augment` |
 | `openclaw` | OpenClaw | `.openclaw/skills` | `.openclaw` |
+| `copaw` | Copaw | `.copaw/skill_pool` | `.copaw` |
 | `cline` | Cline | `.cline/skills` | `.cline` |
 | `codebuddy` | CodeBuddy | `.codebuddy/skills` | `.codebuddy` |
 | `command_code` | Command Code | `.commandcode/skills` | `.commandcode` |
