@@ -110,6 +110,33 @@ body
 }
 
 #[test]
+fn parses_skill_md_frontmatter_literal_description() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("SKILL.md");
+    fs::write(
+        &p,
+        r#"---
+name: technical-writer
+description: |
+  Creates clear documentation, API references, guides, and
+  technical content for developers and users.
+author: awesome-llm-apps
+---
+
+body
+"#,
+    )
+    .unwrap();
+
+    let (name, desc) = super::parse_skill_md(&p).unwrap();
+    assert_eq!(name, "technical-writer");
+    assert_eq!(
+        desc.as_deref(),
+        Some("Creates clear documentation, API references, guides, and\ntechnical content for developers and users.")
+    );
+}
+
+#[test]
 fn installs_local_skill_and_updates_from_source() {
     let app = tauri::test::mock_app();
     let (_dir, store) = make_store();

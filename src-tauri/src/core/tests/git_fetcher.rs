@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::core::git_fetcher::clone_or_pull;
+use crate::core::git_fetcher::{clone_or_pull, clone_or_pull_sparse};
 
 fn commit_file(repo: &git2::Repository, path: &str, content: &[u8], msg: &str) -> git2::Oid {
     let workdir = repo.workdir().expect("workdir");
@@ -53,4 +53,34 @@ fn clone_then_pull_updates_head() {
     )
     .unwrap();
     assert_eq!(h2, c3.to_string(), "再次调用应更新到最新提交");
+}
+
+#[test]
+fn sparse_clone_only_materializes_requested_subpath() {
+    let origin_dir = tempfile::tempdir().unwrap();
+    let origin = git2::Repository::init(origin_dir.path()).unwrap();
+    let _ = commit_file(&origin, "skills/a/SKILL.md", b"---\nname: A\n---\n", "c1");
+    let _ = commit_file(&origin, "skills/b/SKILL.md", b"---\nname: B\n---\n", "c2");
+
+    let dest_dir = tempfile::tempdir().unwrap();
+    let dest = dest_dir.path().join("clone");
+
+    let head = match clone_or_pull_sparse(
+        origin_dir.path().to_string_lossy().as_ref(),
+        &dest,
+        None,
+        "skills/a",
+        None,
+    ) {
+        Ok(head) => head,
+        Err(err) if format!("{:#}", err).contains("system git is required") => return,
+        Err(err) => panic!("sparse clone failed: {:#}", err),
+    };
+
+    assert!(!head.is_empty());
+    assert!(dest.join("skills/a/SKILL.md").exists());
+    assert!(
+        !dest.join("skills/b/SKILL.md").exists(),
+        "未请求的子目录不应被检出到工作区"
+    );
 }

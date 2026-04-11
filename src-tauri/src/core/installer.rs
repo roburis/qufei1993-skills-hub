@@ -10,7 +10,7 @@ use super::cache_cleanup::get_git_cache_ttl_secs;
 use super::cancel_token::CancelToken;
 use super::central_repo::{ensure_central_repo, resolve_central_repo_path};
 use super::content_hash::hash_dir;
-use super::git_fetcher::clone_or_pull;
+use super::git_fetcher::{clone_or_pull, clone_or_pull_sparse};
 use super::github_download::{download_github_directory, parse_github_api_params};
 use super::skill_store::{SkillRecord, SkillStore};
 use super::sync_engine::copy_dir_recursive;
@@ -113,7 +113,9 @@ pub fn install_git_skill<R: tauri::Runtime>(
         anyhow::bail!("skill already exists in central repo: {:?}", central_path);
     }
 
-    // Fast path: for GitHub URLs with a subpath, download via API instead of cloning.
+    // Fast path: for subpath installs, prefer sparse git checkout.
+    // The old GitHub Contents API path is much slower on large repos because it performs
+    // one directory/file request at a time and can time out before we even attempt git.
     let github_token = store.get_setting("github_token")?.unwrap_or_default();
     let github_token_opt = if github_token.is_empty() {
         None
@@ -127,67 +129,20 @@ pub fn install_git_skill<R: tauri::Runtime>(
         parsed.subpath.as_deref(),
     ) {
         log::info!(
-            "[installer] using GitHub API download: {}/{} path={}",
+            "[installer] using sparse git checkout for subpath install: {}/{} path={}",
             owner,
             repo,
             subpath
         );
-        match download_github_directory(
-            &owner,
-            &repo,
-            &branch,
+        match clone_to_cache_subpath(
+            app,
+            store,
+            &parsed.clone_url,
+            Some(branch.as_str()),
             &subpath,
-            &central_path,
             cancel,
-            github_token_opt,
         ) {
-            Ok(()) => {
-                revision = format!("api-download-{}", branch);
-            }
-            Err(err) => {
-                // Clean up partial download
-                let _ = std::fs::remove_dir_all(&central_path);
-                let err_msg = format!("{:#}", err);
-                // If cancelled, propagate immediately
-                if err_msg.contains("CANCELLED|") {
-                    return Err(err);
-                }
-                // If 404/403, the path doesn't exist on GitHub — don't waste time with git clone
-                if err_msg.contains("404") || err_msg.contains("Not Found") {
-                    anyhow::bail!(
-                        "该 Skill 在 GitHub 上未找到（可能已被删除或路径已变更）。\n请检查链接是否正确：{}/tree/{}/{}",
-                        parsed.clone_url.trim_end_matches(".git"),
-                        branch,
-                        subpath
-                    );
-                }
-                if let Some(rest) = err_msg.strip_prefix("RATE_LIMITED|") {
-                    let mins: i64 = rest.trim().parse().unwrap_or(0);
-                    if mins > 0 {
-                        anyhow::bail!(
-                            "GitHub API 频率限制已触发，约 {} 分钟后重置。可在设置中配置 GitHub Token 以提升限额。",
-                            mins
-                        );
-                    }
-                    anyhow::bail!(
-                        "GitHub API 频率限制已触发。可在设置中配置 GitHub Token 以提升限额。"
-                    );
-                }
-                if err_msg.contains("403") || err_msg.contains("Forbidden") {
-                    anyhow::bail!("GitHub API 访问被拒绝（可能触发了频率限制）。请稍后再试。");
-                }
-                // Other errors: fall back to git clone
-                log::warn!(
-                    "[installer] GitHub API download failed, falling back to git clone: {:#}",
-                    err
-                );
-                let (repo_dir, rev) = clone_to_cache(
-                    app,
-                    store,
-                    &parsed.clone_url,
-                    parsed.branch.as_deref(),
-                    cancel,
-                )?;
+            Ok((repo_dir, rev)) => {
                 let sub_src = repo_dir.join(&subpath);
                 if !sub_src.exists() {
                     anyhow::bail!("subpath not found in repo: {:?}", sub_src);
@@ -195,6 +150,64 @@ pub fn install_git_skill<R: tauri::Runtime>(
                 copy_dir_recursive(&sub_src, &central_path)
                     .with_context(|| format!("copy {:?} -> {:?}", sub_src, central_path))?;
                 revision = rev;
+            }
+            Err(err) => {
+                // Clean up partial content before fallback.
+                let _ = std::fs::remove_dir_all(&central_path);
+                let err_msg = format!("{:#}", err);
+                if err_msg.contains("CANCELLED|") {
+                    return Err(err);
+                }
+                log::warn!(
+                    "[installer] sparse git checkout failed, falling back to GitHub API download: {:#}",
+                    err
+                );
+                match download_github_directory(
+                    &owner,
+                    &repo,
+                    &branch,
+                    &subpath,
+                    &central_path,
+                    cancel,
+                    github_token_opt,
+                ) {
+                    Ok(()) => {
+                        revision = format!("api-download-{}", branch);
+                    }
+                    Err(err) => {
+                        let _ = std::fs::remove_dir_all(&central_path);
+                        let err_msg = format!("{:#}", err);
+                        if err_msg.contains("CANCELLED|") {
+                            return Err(err);
+                        }
+                        if err_msg.contains("404") || err_msg.contains("Not Found") {
+                            anyhow::bail!(
+                                "该 Skill 在 GitHub 上未找到（可能已被删除或路径已变更）。\n请检查链接是否正确：{}/tree/{}/{}",
+                                parsed.clone_url.trim_end_matches(".git"),
+                                branch,
+                                subpath
+                            );
+                        }
+                        if let Some(rest) = err_msg.strip_prefix("RATE_LIMITED|") {
+                            let mins: i64 = rest.trim().parse().unwrap_or(0);
+                            if mins > 0 {
+                                anyhow::bail!(
+                                    "GitHub API 频率限制已触发，约 {} 分钟后重置。可在设置中配置 GitHub Token 以提升限额。",
+                                    mins
+                                );
+                            }
+                            anyhow::bail!(
+                                "GitHub API 频率限制已触发。可在设置中配置 GitHub Token 以提升限额。"
+                            );
+                        }
+                        if err_msg.contains("403") || err_msg.contains("Forbidden") {
+                            anyhow::bail!(
+                                "GitHub API 访问被拒绝（可能触发了频率限制）。请稍后再试。"
+                            );
+                        }
+                        return Err(err);
+                    }
+                }
             }
         }
     } else {
@@ -627,13 +640,24 @@ pub fn update_managed_skill_from_source<R: tauri::Runtime>(
             .ok_or_else(|| anyhow::anyhow!("missing source_ref for git skill"))?;
         let parsed = parse_github_url(repo_url);
 
-        let (repo_dir, rev) = clone_to_cache(
-            app,
-            store,
-            &parsed.clone_url,
-            parsed.branch.as_deref(),
-            None,
-        )?;
+        let (repo_dir, rev) = if let Some(subpath) = record.source_subpath.as_deref() {
+            clone_to_cache_subpath(
+                app,
+                store,
+                &parsed.clone_url,
+                parsed.branch.as_deref(),
+                subpath,
+                None,
+            )?
+        } else {
+            clone_to_cache(
+                app,
+                store,
+                &parsed.clone_url,
+                parsed.branch.as_deref(),
+                None,
+            )?
+        };
         new_revision = Some(rev);
 
         // Prefer stored source_subpath (from install time) over URL-parsed subpath.
@@ -1177,7 +1201,7 @@ fn clone_to_cache<R: tauri::Runtime>(
     std::fs::create_dir_all(&cache_root)
         .with_context(|| format!("failed to create cache dir {:?}", cache_root))?;
 
-    let repo_dir = cache_root.join(repo_cache_key(clone_url, branch));
+    let repo_dir = cache_root.join(repo_cache_key(clone_url, branch, None));
     let meta_path = repo_dir.join(".skills-hub-cache.json");
 
     let lock = GIT_CACHE_LOCK.get_or_init(|| Mutex::new(()));
@@ -1242,13 +1266,101 @@ fn clone_to_cache<R: tauri::Runtime>(
     Ok((repo_dir, rev))
 }
 
-fn repo_cache_key(clone_url: &str, branch: Option<&str>) -> String {
+fn clone_to_cache_subpath<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    store: &SkillStore,
+    clone_url: &str,
+    branch: Option<&str>,
+    subpath: &str,
+    cancel: Option<&CancelToken>,
+) -> Result<(PathBuf, String)> {
+    let started = std::time::Instant::now();
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .context("failed to resolve app cache dir")?;
+    let cache_root = cache_dir.join("skills-hub-git-cache");
+    std::fs::create_dir_all(&cache_root)
+        .with_context(|| format!("failed to create cache dir {:?}", cache_root))?;
+
+    let repo_dir = cache_root.join(repo_cache_key(clone_url, branch, Some(subpath)));
+    let meta_path = repo_dir.join(".skills-hub-cache.json");
+
+    let lock = GIT_CACHE_LOCK.get_or_init(|| Mutex::new(()));
+    let _guard = lock.lock().unwrap_or_else(|err| err.into_inner());
+
+    if repo_dir.join(".git").exists() {
+        if let Ok(meta) = std::fs::read_to_string(&meta_path) {
+            if let Ok(meta) = serde_json::from_str::<RepoCacheMeta>(&meta) {
+                if let Some(head) = meta.head {
+                    let ttl_ms = get_git_cache_ttl_secs(store).saturating_mul(1000);
+                    if ttl_ms > 0 && now_ms().saturating_sub(meta.last_fetched_ms) < ttl_ms {
+                        log::info!(
+                            "[installer] sparse git cache hit (fresh) {}s url={} branch={:?} subpath={} repo_dir={:?}",
+                            started.elapsed().as_secs_f32(),
+                            clone_url,
+                            branch,
+                            subpath,
+                            repo_dir
+                        );
+                        return Ok((repo_dir, head));
+                    }
+                }
+            }
+        }
+    }
+
+    log::info!(
+        "[installer] sparse git cache miss/stale; fetching {} url={} branch={:?} subpath={} repo_dir={:?}",
+        started.elapsed().as_secs_f32(),
+        clone_url,
+        branch,
+        subpath,
+        repo_dir
+    );
+
+    let rev = match clone_or_pull_sparse(clone_url, &repo_dir, branch, subpath, cancel) {
+        Ok(rev) => rev,
+        Err(err) => {
+            if repo_dir.exists() {
+                let _ = std::fs::remove_dir_all(&repo_dir);
+            }
+            clone_or_pull_sparse(clone_url, &repo_dir, branch, subpath, cancel)
+                .with_context(|| format!("{:#}", err))?
+        }
+    };
+
+    let _ = std::fs::write(
+        &meta_path,
+        serde_json::to_string(&RepoCacheMeta {
+            last_fetched_ms: now_ms(),
+            head: Some(rev.clone()),
+        })
+        .unwrap_or_else(|_| "{}".to_string()),
+    );
+
+    log::info!(
+        "[installer] sparse git cache ready {}s url={} branch={:?} subpath={} head={}",
+        started.elapsed().as_secs_f32(),
+        clone_url,
+        branch,
+        subpath,
+        rev
+    );
+    Ok((repo_dir, rev))
+}
+
+fn repo_cache_key(clone_url: &str, branch: Option<&str>, subpath: Option<&str>) -> String {
     use sha2::Digest;
     let mut hasher = sha2::Sha256::new();
     hasher.update(clone_url.as_bytes());
     hasher.update(b"\n");
     if let Some(b) = branch {
         hasher.update(b.as_bytes());
+    }
+    hasher.update(b"\n");
+    if let Some(s) = subpath {
+        hasher.update(s.as_bytes());
     }
     hex::encode(hasher.finalize())
 }
@@ -1275,30 +1387,73 @@ fn parse_skill_md(path: &Path) -> Option<(String, Option<String>)> {
 
 fn parse_skill_md_with_reason(path: &Path) -> Result<(String, Option<String>), &'static str> {
     let text = std::fs::read_to_string(path).map_err(|_| "read_failed")?;
-    let mut lines = text.lines();
-    if lines.next().map(|v| v.trim()) != Some("---") {
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.first().map(|v| v.trim()) != Some("---") {
         return Err("invalid_frontmatter");
     }
     let mut name: Option<String> = None;
     let mut desc: Option<String> = None;
     let mut found_end = false;
-    for line in lines.by_ref() {
-        let l = line.trim();
+    let mut i = 1usize;
+    while i < lines.len() {
+        let raw = lines[i];
+        let l = raw.trim();
         if l == "---" {
             found_end = true;
             break;
         }
         if let Some(v) = l.strip_prefix("name:") {
-            name = Some(v.trim().trim_matches('"').to_string());
+            name = Some(clean_frontmatter_value(v));
         } else if let Some(v) = l.strip_prefix("description:") {
-            desc = Some(v.trim().trim_matches('"').to_string());
+            let v = v.trim();
+            if v == "|" || v == ">" {
+                let folded = v == ">";
+                let mut block_lines: Vec<String> = Vec::new();
+                while i + 1 < lines.len() {
+                    let next = lines[i + 1];
+                    if next.trim() == "---" {
+                        break;
+                    }
+                    if !next.trim().is_empty() && !next.starts_with(char::is_whitespace) {
+                        break;
+                    }
+                    block_lines.push(next.strip_prefix("  ").unwrap_or(next).to_string());
+                    i += 1;
+                }
+                let value = if folded {
+                    block_lines
+                        .iter()
+                        .map(|line| line.trim())
+                        .filter(|line| !line.is_empty())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                } else {
+                    block_lines.join("\n").trim().to_string()
+                };
+                desc = Some(value);
+            } else {
+                desc = Some(clean_frontmatter_value(v));
+            }
         }
+        i += 1;
     }
     if !found_end {
         return Err("invalid_frontmatter");
     }
     let name = name.ok_or("missing_name")?;
     Ok((name, desc))
+}
+
+fn clean_frontmatter_value(value: &str) -> String {
+    let value = value.trim();
+    if value.len() >= 2
+        && ((value.starts_with('"') && value.ends_with('"'))
+            || (value.starts_with('\'') && value.ends_with('\'')))
+    {
+        value[1..value.len() - 1].to_string()
+    } else {
+        value.to_string()
+    }
 }
 
 #[cfg(test)]

@@ -247,11 +247,26 @@ function parseFrontmatter(raw: string): {
   if (end === -1) return { meta: null, body: raw }
   const block = raw.slice(4, end)
   const entries: Record<string, string> = {}
-  for (const line of block.split('\n')) {
+  const lines = block.split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
     const idx = line.indexOf(':')
     if (idx === -1) continue
     const key = line.slice(0, idx).trim()
     let val = line.slice(idx + 1).trim()
+    if (val === '|' || val === '>') {
+      const blockLines: string[] = []
+      while (i + 1 < lines.length) {
+        const next = lines[i + 1]
+        if (next.trim() !== '' && !/^\s/.test(next)) break
+        blockLines.push(next.replace(/^\s{2}/, ''))
+        i++
+      }
+      val =
+        val === '|'
+          ? blockLines.join('\n').trim()
+          : blockLines.map((v) => v.trim()).filter(Boolean).join(' ')
+    }
     // strip surrounding quotes
     if (
       val.length >= 2 &&

@@ -90,6 +90,181 @@ pub fn clone_or_pull(
     Ok(head.to_string())
 }
 
+pub fn clone_or_pull_sparse(
+    repo_url: &str,
+    dest: &Path,
+    branch: Option<&str>,
+    subpath: &str,
+    cancel: Option<&CancelToken>,
+) -> Result<String> {
+    let clean_subpath = subpath.trim_matches('/');
+    if clean_subpath.is_empty() {
+        anyhow::bail!("sparse checkout path is empty");
+    }
+
+    if resolve_git_bin().is_none() {
+        anyhow::bail!("system git is required for sparse checkout");
+    }
+
+    // Ensure parent exists so `git clone` can create dest.
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create parent dir {:?}", parent))?;
+    }
+
+    if dest.exists() {
+        let git_dir = dest.join(".git");
+        for lock_name in &["index.lock", "shallow.lock", "HEAD.lock"] {
+            let lock_path = git_dir.join(lock_name);
+            if lock_path.exists() {
+                log::warn!("[git_fetcher] removing stale lock file: {:?}", lock_path);
+                let _ = std::fs::remove_file(&lock_path);
+            }
+        }
+
+        let out = run_cmd_with_timeout(
+            {
+                let mut cmd = git_cmd();
+                cmd.arg("-C").arg(dest).args([
+                    "sparse-checkout",
+                    "set",
+                    "--no-cone",
+                    clean_subpath,
+                ]);
+                cmd
+            },
+            git_fetch_timeout(),
+            format!("git sparse-checkout set {} in {:?}", clean_subpath, dest),
+            cancel,
+        )?;
+        if !out.status.success() {
+            anyhow::bail!(
+                "git sparse-checkout set failed: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
+
+        let out = run_cmd_with_timeout(
+            {
+                let mut cmd = git_cmd();
+                cmd.arg("-C").arg(dest).args(["fetch", "--prune", "origin"]);
+                cmd
+            },
+            git_fetch_timeout(),
+            format!("git fetch in {:?}", dest),
+            cancel,
+        )?;
+        if !out.status.success() {
+            anyhow::bail!("git fetch failed: {}", String::from_utf8_lossy(&out.stderr));
+        }
+
+        if let Some(branch) = branch {
+            let out = run_cmd_with_timeout(
+                {
+                    let mut cmd = git_cmd();
+                    cmd.arg("-C").arg(dest).args([
+                        "checkout",
+                        "-B",
+                        branch,
+                        &format!("origin/{}", branch),
+                    ]);
+                    cmd
+                },
+                git_fetch_timeout(),
+                format!("git checkout -B {} in {:?}", branch, dest),
+                cancel,
+            )?;
+            if !out.status.success() {
+                anyhow::bail!(
+                    "git checkout branch failed: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                );
+            }
+        } else {
+            let out = run_cmd_with_timeout(
+                {
+                    let mut cmd = git_cmd();
+                    cmd.arg("-C")
+                        .arg(dest)
+                        .args(["reset", "--hard", "FETCH_HEAD"]);
+                    cmd
+                },
+                git_fetch_timeout(),
+                format!("git reset --hard in {:?}", dest),
+                cancel,
+            )?;
+            if !out.status.success() {
+                anyhow::bail!(
+                    "git reset --hard failed: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                );
+            }
+        }
+    } else {
+        let mut cmd = git_cmd();
+        cmd.arg("clone").args([
+            "--depth",
+            "1",
+            "--filter=blob:none",
+            "--sparse",
+            "--no-tags",
+        ]);
+        if let Some(branch) = branch {
+            cmd.arg("--branch").arg(branch).arg("--single-branch");
+        }
+        cmd.arg(repo_url).arg(dest);
+        let out = run_cmd_with_timeout(
+            cmd,
+            git_timeout(),
+            format!("git clone {} into {:?}", repo_url, dest),
+            cancel,
+        )?;
+        if !out.status.success() {
+            anyhow::bail!("git clone failed: {}", String::from_utf8_lossy(&out.stderr));
+        }
+
+        let out = run_cmd_with_timeout(
+            {
+                let mut cmd = git_cmd();
+                cmd.arg("-C").arg(dest).args([
+                    "sparse-checkout",
+                    "set",
+                    "--no-cone",
+                    clean_subpath,
+                ]);
+                cmd
+            },
+            git_fetch_timeout(),
+            format!("git sparse-checkout set {} in {:?}", clean_subpath, dest),
+            cancel,
+        )?;
+        if !out.status.success() {
+            anyhow::bail!(
+                "git sparse-checkout set failed: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
+    }
+
+    let out = run_cmd_with_timeout(
+        {
+            let mut cmd = git_cmd();
+            cmd.arg("-C").arg(dest).args(["rev-parse", "HEAD"]);
+            cmd
+        },
+        git_fetch_timeout(),
+        format!("git rev-parse HEAD in {:?}", dest),
+        cancel,
+    )?;
+    if !out.status.success() {
+        anyhow::bail!(
+            "git rev-parse failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
 fn git_timeout() -> Duration {
     let secs = std::env::var("SKILLS_HUB_GIT_TIMEOUT_SECS")
         .ok()
