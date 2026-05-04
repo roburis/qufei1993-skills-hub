@@ -1125,12 +1125,6 @@ function App() {
     }))
   }, [])
 
-  const handleRefresh = useCallback(() => {
-    void loadManagedSkills()
-    void loadTags()
-  }, [loadManagedSkills, loadTags])
-
-
   const handleReviewImport = useCallback(async () => {
     if (plan) {
       setShowImportModal(true)
@@ -2487,7 +2481,6 @@ function App() {
               includeUntagged={includeUntagged}
               untaggedCount={untaggedCount}
               totalCount={visibleSkills.length}
-              loading={loading}
               onSortChange={handleSortChange}
               onSearchChange={handleSearchChange}
               onScopeFilterChange={handleScopeFilterChange}
@@ -2495,7 +2488,6 @@ function App() {
               onToggleUntagged={handleToggleUntaggedFilter}
               onClearTags={handleClearTagFilters}
               onManageTags={handleOpenTagsPage}
-              onRefresh={handleRefresh}
               t={t}
             />
             <SkillsList
