@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpDown, Check, ChevronDown, RefreshCw, Search, Tags } from 'lucide-react'
+import { ArrowUpDown, Check, ChevronDown, Search, Tags } from 'lucide-react'
 import type { TFunction } from 'i18next'
 import type { TagWithCountDto } from './types'
 
@@ -12,7 +12,6 @@ type FilterBarProps = {
   includeUntagged: boolean
   untaggedCount: number
   totalCount: number
-  loading: boolean
   onSortChange: (value: 'updated' | 'name') => void
   onSearchChange: (value: string) => void
   onScopeFilterChange: (value: 'all' | 'global' | 'project') => void
@@ -20,7 +19,6 @@ type FilterBarProps = {
   onToggleUntagged: () => void
   onClearTags: () => void
   onManageTags: () => void
-  onRefresh: () => void
   t: TFunction
 }
 
@@ -33,7 +31,6 @@ const FilterBar = ({
   includeUntagged,
   untaggedCount,
   totalCount,
-  loading,
   onSortChange,
   onSearchChange,
   onScopeFilterChange,
@@ -41,7 +38,6 @@ const FilterBar = ({
   onToggleUntagged,
   onClearTags,
   onManageTags,
-  onRefresh,
   t,
 }: FilterBarProps) => {
   const [tagMenuOpen, setTagMenuOpen] = useState(false)
@@ -178,15 +174,6 @@ const FilterBar = ({
             placeholder={t('searchPlaceholder')}
           />
         </div>
-        <button
-          className="btn btn-secondary"
-          type="button"
-          onClick={onRefresh}
-          disabled={loading}
-        >
-          <RefreshCw size={14} />
-          {t('refresh')}
-        </button>
       </div>
     </div>
   )
