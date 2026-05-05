@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-05-05
+
+### Added
+- **Skill tags**: Add custom tags to managed skills for easier organization and filtering.
+- **Tags page**: Manage tags from a dedicated Tags page, including create, rename, delete, and quick navigation back to filtered My Skills views.
+- **Tag filtering**: Filter My Skills by one or more tags with OR matching, including a virtual `Untagged` filter for skills without tags.
+- **Per-skill tag editor**: Edit a skill's tag assignments directly from the skill card.
+- **Import search**: Search discovered skill candidates by name, description, or path before importing from a local directory or Git repository.
+
+### Changed
+- **My Skills filter bar**: Removed the manual refresh button; install, delete, sync, and tag-edit flows already refresh the list automatically.
+
+### Fixed
+- **Chinese filter bar layout**: Removing the refresh button fixes the cramped button layout in Chinese.
+- **Discovered skills review**: The discovered skills review dialog now supports search and keeps selection counts aligned with filtered results.
+
+### 中文
+
+#### 新增
+- **Skill 标签**：可为已托管 Skill 添加自定义标签，方便整理和筛选。
+- **标签页面**：新增独立 Tags / 标签页面，支持新建、重命名、删除标签，并可快速跳回已筛选的 My Skills 视图。
+- **标签筛选**：My Skills 支持按一个或多个标签筛选，使用 OR 匹配；同时提供虚拟 `Untagged` / `无标签` 筛选项。
+- **单个 Skill 标签编辑**：可直接从 Skill 卡片打开标签编辑入口，调整该 Skill 的标签关联。
+- **导入搜索**：从本地目录或 Git 仓库导入前，可按名称、描述或路径搜索候选 Skill。
+
+#### 变更
+- **My Skills 筛选栏**：移除手动刷新按钮；安装、删除、同步和编辑标签等流程已自动刷新列表。
+
+#### 修复
+- **中文筛选栏布局**：移除刷新按钮后，修复中文界面下按钮区域拥挤和样式错乱问题。
+- **发现 Skill 审核弹窗**：查看已发现 Skills 时支持搜索，并让选择数量与筛选结果保持一致。
+
 ## [0.5.0] - 2026-04-16
 
 ### Added

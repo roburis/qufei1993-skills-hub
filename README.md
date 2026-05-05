@@ -10,12 +10,14 @@ A cross-platform desktop app (Tauri + React) to manage Agent Skills in one place
 ## Key Features
 
 - **Explore page**: Browse curated featured skills and search online — one-click install & sync to all detected tools
+- **Tags page**: Create, rename, and delete custom tags, then jump back to matching skills from one dedicated view
+- **Tag filtering**: Organize skills with multiple tags and filter My Skills by tag, including `Untagged` skills
 - **Global / project sync**: Sync skills globally across all projects, or scope them to selected project directories
 - **Scope controls**: Switch a skill between Global and Project scope, manage project directories, and filter My Skills by scope
 - **Skill detail view**: Click a skill name to browse its files with Markdown rendering and syntax highlighting (40+ languages)
 - **Unified view**: Managed skills, total skill count, scope badges, and per-tool activation status
 - **Onboarding migration**: Scan existing skills in installed tools, import into the Central Repo, and sync
-- **Import sources**: Local folder / Git URL (including multi-skill repo selection, `.claude/skills/` directory support)
+- **Import sources**: Local folder / Git URL (including searchable multi-skill repo selection, `.claude/skills/` directory support)
 - **Update**: Refresh from source; propagate updates to copy-mode targets
 - **New tool detection**: Detect newly installed tools and prompt to sync managed skills
 
@@ -130,6 +132,7 @@ cargo test
 ## FAQ / Notes
 
 - Where are skills stored? The Central Repo defaults to `~/.skillshub` (configurable in Settings).
+- What are tags for? Tags help you find and organize skills. They do not change where a skill is synced or which tools can use it.
 - What is project-level sync? The skill is still stored once in the Central Repo, but its sync target is a selected project directory such as `<project>/.agents/skills`, `<project>/.claude/skills`, or another tool-specific project skills path.
 - Why is Cursor sync always copy? Cursor currently does not support symlink/junction-based skill directories, so Skills Hub forces directory copy when syncing to Cursor.
 - Why does sync sometimes fall back to copy? Skills Hub prefers symlink/junction, but on some systems (especially Windows) symlinks may be restricted; in that case it falls back to directory copy.
