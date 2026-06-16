@@ -20,6 +20,7 @@ fn adapter_by_key_finds_new_tools() {
     assert!(adapter_by_key("command_code").is_some());
     assert!(adapter_by_key("qwen_code").is_some());
     assert!(adapter_by_key("hermes_agent").is_some());
+    assert!(adapter_by_key("workbuddy").is_some());
 }
 
 #[test]
@@ -67,6 +68,10 @@ fn project_relative_skills_dir_maps_supported_agents() {
     let hermes = adapter_by_key("hermes_agent").unwrap();
     assert_eq!(project_relative_skills_dir(&hermes), ".hermes/skills");
     assert!(!supports_project_scope(&hermes));
+
+    let workbuddy = adapter_by_key("workbuddy").unwrap();
+    assert_eq!(project_relative_skills_dir(&workbuddy), ".workbuddy/skills");
+    assert!(!supports_project_scope(&workbuddy));
 }
 
 #[test]

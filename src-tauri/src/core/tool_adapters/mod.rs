@@ -16,6 +16,7 @@ pub enum ToolId {
     Copaw,
     Cline,
     CodeBuddy,
+    WorkBuddy,
     CommandCode,
     Continue,
     Crush,
@@ -65,6 +66,7 @@ impl ToolId {
             ToolId::Copaw => "copaw",
             ToolId::Cline => "cline",
             ToolId::CodeBuddy => "codebuddy",
+            ToolId::WorkBuddy => "workbuddy",
             ToolId::CommandCode => "command_code",
             ToolId::Continue => "continue",
             ToolId::Crush => "crush",
@@ -203,6 +205,13 @@ pub fn default_tool_adapters() -> Vec<ToolAdapter> {
             // add-skill global path: ~/.codebuddy/skills/
             relative_skills_dir: ".codebuddy/skills",
             relative_detect_dir: ".codebuddy",
+        },
+        ToolAdapter {
+            id: ToolId::WorkBuddy,
+            display_name: "WorkBuddy",
+            // add-skill global path: ~/.workbuddy/skills/
+            relative_skills_dir: ".workbuddy/skills",
+            relative_detect_dir: ".workbuddy",
         },
         ToolAdapter {
             id: ToolId::CommandCode,
@@ -464,7 +473,7 @@ pub fn resolve_project_path(adapter: &ToolAdapter, project_root: &Path) -> Resul
 }
 
 pub fn supports_project_scope(adapter: &ToolAdapter) -> bool {
-    adapter.id != ToolId::HermesAgent
+    !matches!(adapter.id, ToolId::HermesAgent | ToolId::WorkBuddy)
 }
 
 pub fn project_relative_skills_dir(adapter: &ToolAdapter) -> &'static str {
@@ -476,6 +485,7 @@ pub fn project_relative_skills_dir(adapter: &ToolAdapter) -> &'static str {
         ToolId::OpenClaw => "skills",
         ToolId::Cline => ".agents/skills",
         ToolId::CodeBuddy => ".codebuddy/skills",
+        ToolId::WorkBuddy => ".workbuddy/skills",
         ToolId::Codex => ".agents/skills",
         ToolId::CommandCode => ".commandcode/skills",
         ToolId::Continue => ".continue/skills",
