@@ -35,7 +35,12 @@ const ImportModal = ({
     return plan.groups.filter((group) => {
       const fields = [
         group.name,
-        ...group.variants.flatMap((variant) => [variant.path, variant.tool]),
+        ...group.variants.flatMap((variant) => [
+          variant.path,
+          variant.tool,
+          variant.plugin_name ?? '',
+          variant.plugin_version ?? '',
+        ]),
       ]
       return fields.some((value) => value.toLowerCase().includes(normalizedQuery))
     })
@@ -126,38 +131,51 @@ const ImportModal = ({
                   )}
                 </div>
                 <div className="group-variants">
-                  {group.variants.map((variant) => (
-                    <div
-                      className="variant-row"
-                      key={`${group.name}-${variant.tool}-${variant.path}`}
-                    >
-                      {group.has_conflict ? (
-                        <input
-                          type="radio"
-                          name={`variant-${group.name}`}
-                          checked={variantChoice[group.name] === variant.path}
-                          onChange={() => onSelectVariant(group.name, variant.path)}
-                        />
-                      ) : (
-                        <span className="variant-spacer" />
-                      )}
-                      <div className="variant-info">
-                        <span className="path">{variant.path}</span>
-                        <span className="found-pill">
-                          {t('foundIn')} {variant.tool}
-                        </span>
+                  {group.variants.map((variant) => {
+                    const sourceLabel = variant.plugin_name
+                      ? variant.plugin_version
+                        ? t('claudePluginSourceWithVersion', {
+                            plugin: variant.plugin_name,
+                            version: variant.plugin_version,
+                          })
+                        : t('claudePluginSource', {
+                            plugin: variant.plugin_name,
+                          })
+                      : `${t('foundIn')} ${variant.tool}`
+
+                    return (
+                      <div
+                        className="variant-row"
+                        key={`${group.name}-${variant.tool}-${variant.path}`}
+                      >
+                        {group.has_conflict ? (
+                          <input
+                            type="radio"
+                            name={`variant-${group.name}`}
+                            checked={variantChoice[group.name] === variant.path}
+                            onChange={() =>
+                              onSelectVariant(group.name, variant.path)
+                            }
+                          />
+                        ) : (
+                          <span className="variant-spacer" />
+                        )}
+                        <div className="variant-info">
+                          <span className="path">{variant.path}</span>
+                          <span className="found-pill">{sourceLabel}</span>
+                        </div>
+                        {variant.is_link ? (
+                          <span className="meta">
+                            {t('linkLabel', {
+                              target: variant.link_target ?? t('unknown'),
+                            })}
+                          </span>
+                        ) : (
+                          <span className="meta">{t('directory')}</span>
+                        )}
                       </div>
-                      {variant.is_link ? (
-                        <span className="meta">
-                          {t('linkLabel', {
-                            target: variant.link_target ?? t('unknown'),
-                          })}
-                        </span>
-                      ) : (
-                        <span className="meta">{t('directory')}</span>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             ))}

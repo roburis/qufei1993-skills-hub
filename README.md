@@ -51,6 +51,7 @@ Project skills dirs are relative to the selected project root. Tools marked `N/A
 | `copaw` | Copaw | `.copaw/skill_pool` | `.copaw/skill_pool` | `.copaw` |
 | `cline` | Cline | `.agents/skills` | `.agents/skills` | `.agents` |
 | `codebuddy` | CodeBuddy | `.codebuddy/skills` | `.codebuddy/skills` | `.codebuddy` |
+| `codewhale` | CodeWhale | `.codewhale/skills` | `.codewhale/skills` | `.codewhale` |
 | `workbuddy` | WorkBuddy | `.workbuddy/skills` | `N/A` | `.workbuddy` |
 | `command_code` | Command Code | `.commandcode/skills` | `.commandcode/skills` | `.commandcode` |
 | `continue` | Continue | `.continue/skills` | `.continue/skills` | `.continue` |
