@@ -5,6 +5,9 @@ export type OnboardingVariant = {
   fingerprint?: string | null
   is_link: boolean
   link_target?: string | null
+  plugin_name?: string | null
+  plugin_version?: string | null
+  plugin_scope?: string | null
 }
 
 export type OnboardingGroup = {

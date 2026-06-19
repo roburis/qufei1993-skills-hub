@@ -231,6 +231,9 @@ export const resources = {
       toolsScanned: 'Tools scanned: {{count}}',
       skillsFound: 'Skills found: {{count}}',
       foundIn: 'Found in',
+      claudePluginSource: 'Claude Code plugin · {{plugin}} · User',
+      claudePluginSourceWithVersion:
+        'Claude Code plugin · {{plugin}} · v{{version}} · User',
       errors: {
         notTauri: 'Current environment is not Tauri. Please run `npm run tauri dev`.',
         skillExistsInHub: 'This skill already exists in Hub. No need to install again.',
@@ -602,6 +605,9 @@ export const resources = {
       toolsScanned: '已扫描工具数：{{count}}',
       skillsFound: '发现 Skills 数：{{count}}',
       foundIn: '发现于',
+      claudePluginSource: 'Claude Code 插件 · {{plugin}} · 用户级',
+      claudePluginSourceWithVersion:
+        'Claude Code 插件 · {{plugin}} · v{{version}} · 用户级',
       errors: {
         notTauri: '当前环境不是 Tauri，请用 `npm run tauri dev` 启动应用。',
         skillExistsInHub: '该 Skill 已存在于 Hub，无需重复安装。',

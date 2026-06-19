@@ -21,3 +21,12 @@
 - 英文和中文工具支持列表已同步补充 CodeWhale。
 - 增加 Rust 测试，覆盖工具标识、全局目录、检测目录和项目目录。
 - 实现验证：`npm run check`。
+
+### 自动发现 Claude Code 插件中的 Skills
+
+- 支持读取 Claude Code 的已安装插件清单，自动发现用户级插件中包含的 Skills（Issue [#69](https://github.com/qufei1993/skills-hub/issues/69)）。
+- 支持插件根目录、标准 `skills/` 目录，以及 `.claude-plugin/plugin.json` 声明的自定义 Skill 路径。
+- 项目级插件暂不纳入自动发现，避免将只对特定项目生效的 Skill 错误导入为全局托管项。
+- 发现结果会显示插件名称和版本，并继续由用户审核选择后导入。
+- 按真实路径去重，并拒绝插件根目录之外的声明路径，避免重复条目和越界扫描。
+- 实现验证：`npm run check`。
