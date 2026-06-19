@@ -16,6 +16,7 @@ pub enum ToolId {
     Copaw,
     Cline,
     CodeBuddy,
+    CodeWhale,
     WorkBuddy,
     CommandCode,
     Continue,
@@ -66,6 +67,7 @@ impl ToolId {
             ToolId::Copaw => "copaw",
             ToolId::Cline => "cline",
             ToolId::CodeBuddy => "codebuddy",
+            ToolId::CodeWhale => "codewhale",
             ToolId::WorkBuddy => "workbuddy",
             ToolId::CommandCode => "command_code",
             ToolId::Continue => "continue",
@@ -205,6 +207,13 @@ pub fn default_tool_adapters() -> Vec<ToolAdapter> {
             // add-skill global path: ~/.codebuddy/skills/
             relative_skills_dir: ".codebuddy/skills",
             relative_detect_dir: ".codebuddy",
+        },
+        ToolAdapter {
+            id: ToolId::CodeWhale,
+            display_name: "CodeWhale",
+            // CodeWhale default global path: ~/.codewhale/skills/
+            relative_skills_dir: ".codewhale/skills",
+            relative_detect_dir: ".codewhale",
         },
         ToolAdapter {
             id: ToolId::WorkBuddy,
@@ -485,6 +494,7 @@ pub fn project_relative_skills_dir(adapter: &ToolAdapter) -> &'static str {
         ToolId::OpenClaw => "skills",
         ToolId::Cline => ".agents/skills",
         ToolId::CodeBuddy => ".codebuddy/skills",
+        ToolId::CodeWhale => ".codewhale/skills",
         ToolId::WorkBuddy => ".workbuddy/skills",
         ToolId::Codex => ".agents/skills",
         ToolId::CommandCode => ".commandcode/skills",

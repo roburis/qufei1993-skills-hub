@@ -24,6 +24,17 @@ fn adapter_by_key_finds_new_tools() {
 }
 
 #[test]
+fn codewhale_adapter_uses_tool_specific_skill_dirs() {
+    let codewhale = adapter_by_key("codewhale").unwrap();
+
+    assert_eq!(codewhale.id, ToolId::CodeWhale);
+    assert_eq!(codewhale.relative_skills_dir, ".codewhale/skills");
+    assert_eq!(codewhale.relative_detect_dir, ".codewhale");
+    assert_eq!(project_relative_skills_dir(&codewhale), ".codewhale/skills");
+    assert!(supports_project_scope(&codewhale));
+}
+
+#[test]
 fn adapters_sharing_skills_dir_groups_amp_and_kimi() {
     let amp = adapter_by_key("amp").unwrap();
     let group = adapters_sharing_skills_dir(&amp);
